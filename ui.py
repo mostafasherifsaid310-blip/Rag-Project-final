@@ -2,7 +2,7 @@ import gradio as gr
 from fastapi import FastAPI, UploadFile, File
 from typing import List
 import threading
-
+# from evaluation import evaluate_system, test_set
 from ingestion import upload_files
 from chat_hybrid import hybrid_chat
 
@@ -59,11 +59,11 @@ def chat_gradio(message, history):
         )
         
         
-    conversation_history[-1]["content"] = partial_answer
-    yield (
-            [{"role": msg["role"], "content": msg["content"]} for msg in conversation_history],
-            ""
-        )
+    # conversation_history[-1]["content"] = partial_answer
+    # yield (
+    #         [{"role": msg["role"], "content": msg["content"]} for msg in conversation_history],
+    #         ""
+    #     )
 
 def clear_gradio():
     global conversation_history
@@ -74,6 +74,26 @@ def clear_gradio():
     except ImportError:
         pass
     return []
+
+def ask_and_research_eval(question):
+
+    from evaluation import research_evaluation
+
+    result = research_evaluation(question)
+
+    return f"""
+🤖 Answer
+{result['answer']}
+
+---------------------------------------------
+
+📊 Research Evaluation
+
+✅ Answer Relevance: {result['answer_relevance']}
+📂 Faithfulness: {result['faithfulness']}
+🚨 Hallucination Risk: {result['hallucination_risk']}
+🔥 Confidence Score: {result['confidence']} / 10
+"""
 
 def run_gradio():
     with gr.Blocks() as demo:
@@ -93,7 +113,28 @@ def run_gradio():
 
             msg.submit(chat_gradio, [msg, chatbot], [chatbot, msg])
             clear.click(clear_gradio, None, chatbot)
-            
+        
+        with gr.Tab("📊 Research Evaluation 🔥"):
+
+            question_input = gr.Textbox(
+        label="Ask about uploaded file",
+        placeholder="اسأل أي سؤال عن الملف...",
+        lines=2
+    )
+
+            ask_btn = gr.Button("Ask & Evaluate 🚀")
+
+            output_box = gr.Textbox(
+        label="Result",
+        lines=20,
+        interactive=False
+    )
+
+            ask_btn.click(
+        ask_and_research_eval,
+        inputs=question_input,
+        outputs=output_box
+    )
         demo.queue()
         demo.launch(server_name="127.0.0.1", server_port=7860,share=False)
        
@@ -112,5 +153,3 @@ if __name__ == "__main__":
 
     # تشغيل FastAPI على بورت مختلف لتجنب التعارض
     uvicorn.run(app, host="127.0.0.1", port=8000)
-
-
